@@ -32,7 +32,20 @@ from .modeling_tf_utils import TFPreTrainedModel, get_initializer
 from .file_utils import add_start_docstrings
 from .modeling_tf_pytorch_utils import load_pytorch_checkpoint_in_tf2_model
 
+# Designed to be a drop-in replacement for standard Keras Ternarized
+from hbtest.dense_ternarized import DenseTernarized
+from typing import Union
+
 logger = logging.getLogger(__name__)
+
+Dense:Union[DenseTernarized,tf.keras.layers.Dense]
+_use_ternarized = os.environ.get('HF_TERNARIZED_DENSE')
+if _use_ternarized == 'y':
+  Dense = DenseTernarized
+elif _use_ternarized == 'n':
+  Dense = tf.keras.layers.Dense
+else:
+  raise ValueError("Environ HF_TERNARIZED_DENSE should be set to either 'y' or 'n'")
 
 
 TF_BERT_PRETRAINED_MODEL_ARCHIVE_MAP = {
@@ -198,13 +211,13 @@ class TFBertSelfAttention(tf.keras.layers.Layer):
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = tf.keras.layers.Dense(self.all_head_size,
-                                           kernel_initializer=get_initializer(config.initializer_range),
-                                           name='query')
-        self.key = tf.keras.layers.Dense(self.all_head_size,
+        self.query = DenseTernarized(self.all_head_size,
+                                     kernel_initializer=get_initializer(config.initializer_range),
+                                     name='query')
+        self.key = DenseTernarized(self.all_head_size,
                                          kernel_initializer=get_initializer(config.initializer_range),
                                          name='key')
-        self.value = tf.keras.layers.Dense(self.all_head_size,
+        self.value = DenseTernarized(self.all_head_size,
                                            kernel_initializer=get_initializer(config.initializer_range),
                                            name='value')
 
@@ -259,7 +272,7 @@ class TFBertSelfAttention(tf.keras.layers.Layer):
 class TFBertSelfOutput(tf.keras.layers.Layer):
     def __init__(self, config, **kwargs):
         super(TFBertSelfOutput, self).__init__(**kwargs)
-        self.dense = tf.keras.layers.Dense(config.hidden_size,
+        self.dense = DenseTernarized(config.hidden_size,
                                            kernel_initializer=get_initializer(config.initializer_range),
                                            name='dense')
         self.LayerNorm = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name='LayerNorm')
@@ -295,7 +308,7 @@ class TFBertAttention(tf.keras.layers.Layer):
 class TFBertIntermediate(tf.keras.layers.Layer):
     def __init__(self, config, **kwargs):
         super(TFBertIntermediate, self).__init__(**kwargs)
-        self.dense = tf.keras.layers.Dense(config.intermediate_size,
+        self.dense = DenseTernarized(config.intermediate_size,
                                            kernel_initializer=get_initializer(config.initializer_range),
                                            name='dense')
         if isinstance(config.hidden_act, str) or (sys.version_info[0] == 2 and isinstance(config.hidden_act, unicode)):
@@ -312,7 +325,7 @@ class TFBertIntermediate(tf.keras.layers.Layer):
 class TFBertOutput(tf.keras.layers.Layer):
     def __init__(self, config, **kwargs):
         super(TFBertOutput, self).__init__(**kwargs)
-        self.dense = tf.keras.layers.Dense(config.hidden_size,
+        self.dense = DenseTernarized(config.hidden_size,
                                            kernel_initializer=get_initializer(config.initializer_range),
                                            name='dense')
         self.LayerNorm = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name='LayerNorm')
